@@ -1,5 +1,5 @@
 
-name: Build PW Auto Fishing v1.3 APK
+name: Build PW Auto Fishing v1.4 APK
 
 on:
   workflow_dispatch:
@@ -28,17 +28,19 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Extract Auto Fishing v1.3
+      - name: Extract Auto Fishing v1.4
         shell: bash
         run: |
           python3 - <<'PYCODE'
           from pathlib import Path
           from zipfile import ZipFile
 
-          z = Path('PW_AutoFishing_v1.3_Android_Source.zip')
+          z = Path('PW_AutoFishing_v1.4_Android_Source.zip')
 
           if not z.is_file():
-              raise SystemExit('File ZIP v1.3 tidak ditemukan')
+              raise SystemExit(
+                  'File ZIP v1.4 tidak ditemukan di repository'
+              )
 
           with ZipFile(z) as archive:
               for name in archive.namelist():
@@ -46,16 +48,20 @@ jobs:
                       raise SystemExit('Unsafe ZIP path')
               archive.extractall('.')
 
-          print('Project v1.3 extracted')
+          print('Project v1.4 extracted')
           PYCODE
 
+      - name: Verify Android SDK
+        run: |
+          test -d "$ANDROID_HOME/platforms/android-35"
+          test -d "$ANDROID_HOME/build-tools/35.0.0"
+
       - name: Build APK
-        run: gradle :app:assembleDebug --no-daemon
+        run: gradle :app:assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PW-AutoFishing-v1.3-APK
+          name: PW-AutoFishing-v1.4-APK
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
-          
