@@ -1,4 +1,5 @@
-name: Build Pixel Worlds APK from ZIP
+
+name: Build PW v1.2 APK
 
 on:
   workflow_dispatch:
@@ -21,58 +22,46 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Use preinstalled Android SDK
-        shell: bash
-        run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
-          test -d "$ANDROID_HOME/platforms/android-35"
-          test -d "$ANDROID_HOME/build-tools/35.0.0"
+
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-      - name: Extract uploaded project ZIP
+      - name: Extract v1.2 project
         shell: bash
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
+          python3 - <<'PYCODE'
           from zipfile import ZipFile
+          from pathlib import Path
 
-          zips = sorted(Path('.').glob(
-              'PixelWorlds_AutoFishing_GitHub_Ready_v1.0*.zip'
-          ))
+          z = Path('PW_AutoFishing_v1.2_Android_Source.zip')
 
-          if not zips:
+          if not z.is_file():
               raise SystemExit(
-                  'ZIP proyek tidak ditemukan di folder utama repository.'
+                  'Upload PW_AutoFishing_v1.2_Android_Source.zip to repository root'
               )
 
-          with ZipFile(zips[0]) as z:
-              bad = [
-                  n for n in z.namelist()
-                  if n.startswith('/') or '..' in Path(n).parts
-              ]
-              if bad:
-                  raise SystemExit('ZIP berisi path tidak aman.')
-              z.extractall('.')
+          with ZipFile(z) as archive:
+              for name in archive.namelist():
+                  if name.startswith('/') or '..' in Path(name).parts:
+                      raise SystemExit('Unsafe ZIP path')
+              archive.extractall('.')
 
-          if not Path('app/build.gradle.kts').exists():
-              raise SystemExit(
-                  'app/build.gradle.kts tidak ditemukan setelah ekstraksi.'
-              )
+          print('Project v1.2 extracted')
+          PYCODE
 
-          print('Project extracted successfully')
-          PY
+      - name: Verify Android SDK
+        run: |
+          test -d "$ANDROID_HOME/platforms/android-35"
+          test -d "$ANDROID_HOME/build-tools/35.0.0"
 
       - name: Build debug APK
-        run: gradle :app:assembleDebug --no-daemon --stacktrace
+        run: gradle :app:assembleDebug --no-daemon
 
       - name: Upload APK
-        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: PixelWorlds-AutoFishing-DEV-APK
+          name: PW-AutoFishing-v1.2-APK
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
