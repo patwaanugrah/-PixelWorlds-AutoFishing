@@ -1,20 +1,22 @@
-
-name: Build Pixel Worlds APK
+name: Build Pixel Worlds APK from ZIP
 
 on:
   workflow_dispatch:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout project
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -23,15 +25,54 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+      - name: Install Android SDK 35
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
 
-      - name: Build APK
-        run: gradle assembleDebug --no-daemon
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Extract uploaded project ZIP
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          zips = sorted(Path('.').glob(
+              'PixelWorlds_AutoFishing_GitHub_Ready_v1.0*.zip'
+          ))
+
+          if not zips:
+              raise SystemExit(
+                  'ZIP proyek tidak ditemukan di folder utama repository.'
+              )
+
+          with ZipFile(zips[0]) as z:
+              bad = [
+                  n for n in z.namelist()
+                  if n.startswith('/') or '..' in Path(n).parts
+              ]
+              if bad:
+                  raise SystemExit('ZIP berisi path tidak aman.')
+              z.extractall('.')
+
+          if not Path('app/build.gradle.kts').exists():
+              raise SystemExit(
+                  'app/build.gradle.kts tidak ditemukan setelah ekstraksi.'
+              )
+
+          print('Project extracted successfully')
+          PY
+
+      - name: Build debug APK
+        run: gradle :app:assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: PixelWorlds-AutoFishing-APK
+          name: PixelWorlds-AutoFishing-DEV-APK
           path: app/build/outputs/apk/debug/*.apk
-          
+          if-no-files-found: error
